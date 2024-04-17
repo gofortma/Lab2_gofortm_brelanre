@@ -55,13 +55,9 @@ def client_program():
     if(len(sys.argv) != 3):
         print("Usage: python client.py <server_(IP)_address> <server_port_number>")
         sys.exit()
-    #host = socket.gethostname()
-    #host = sys.argv[2]
     port = int(sys.argv[2])
 
     server_ip = socket.gethostbyname(sys.argv[1])
-    print("server IP: ", server_ip)
-
     server_addr = (server_ip, port)
 
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # instantiate
@@ -70,99 +66,96 @@ def client_program():
     message = input(" -> ")  # take input
 
     current_path = os.getcwd()
-    # print("current path: ", current_path)
 
     while message.lower().strip() != 'exit':
 
-        command = message.split();
+        command = message.split()
         if len(command) != 3:
-            print("Usage: iWant/uTake <filename> <file directory destination>")
+            print("Usage: iWant/uTake <filename> <destination directory>")
             message = input(" -> ")
             continue
             
         if command[0] == "iWant":
-            print("iWant")
             filename = command[1]
             dest = command[2]
 
             if(dest == "default"):
-                dest = current_path + "/ReceivedFiles"
-            if(dest == "."):
-                dest = current_path
+                dest = current_path + "/Client/ReceivedFiles"
+            elif(dest == "."):
+                dest = current_path + "/Client"
+            else:
+                dest = current_path + "/Client" + dest
+            
+            
+            print(dest)
             # if the destination does not exist
             if not os.path.exists(dest):
-                print("not found in directory, please provide the directory")
+                print("Destination directory does not exist")
             elif not os.path.isdir(dest):
-                print("not a directory")
+                print("Destination provided is not a directory")
             else:
-                print("Directory valid")
-                client_socket.send(command[0].encode()) # send command
-                client_socket.send(command[1].encode()) # send filename
-
+                client_socket.send(message.encode()) # send command
                 # recieve the size of the file
-                size = client_socket.recv(BUFFER_SIZE).decode()
-                print("size: ", size)
-
-                if(size == -1):
-                    print("file does not exist")
+                size = int(client_socket.recv(10).decode())
+                if(size == 0):
+                    print("What you talkin bout Willis?  I aint seen that file anywhere!")
                 else: 
-                    print("Recieving file...")
-                    size = int(size)
+                    print("\tfile transfer started...")
                     recieve_call = ceil(size/BUFFER_SIZE)
-                    print("recieve call: ", recieve_call)
-
 
                     # recieve the file from the server
                     with open(os.path.join(dest, filename), "wb") as f:
                         for _ in range(recieve_call):
-                            print("reading file")
                             bytes_read = client_socket.recv(BUFFER_SIZE)
                             f.write(bytes_read)
                     f.close()
-                    print("File recieved successfully")
+                    print("\tfile transfer of " + str(size) + " bytes complete and placed in " + dest)
 
         elif command[0] == "uTake":
-            print("uTake")
             filename = command[1]
             dest = command[2]
 
-            client_socket.send(command[0].encode()) # send command
-            client_socket.send(command[2].encode()) # send directory
+            if(dest == "default"):
+                dest = current_path + "/Server/ReceivedFiles"
+            elif(dest == "."):
+                dest = current_path + "/Server"
+            else:
+                dest = current_path + "/Server" + dest
+
+            client_socket.send(message.encode()) # send user input
             
             is_dir_exist = client_socket.recv(BUFFER_SIZE).decode()
             if(is_dir_exist == "-1"):
-                print("not found in directory")
+                print("Destination directory is not valid")
             else: 
-                print("Directory valid")
                 # if the file does not exist in the FileStore directory
-                if not os.path.isfile(os.path.join(current_path + "/FileStore", filename)):
+                if not os.path.isfile(os.path.join(current_path + "/Client/FileStore", filename)):
                     print("What you talkin bout Willis?  I aint seen that file anywhere!")
-                    client_socket.send("-1".encode())
-                elif not os.path.exists(os.path.join(current_path +"/FileStore", filename)):
+                    client_socket.send("0000000000".encode())
+                elif not os.path.exists(os.path.join(current_path +"/Client/FileStore", filename)):
                     print("What you talkin bout Willis?  I aint seen that file anywhere!")
-                    client_socket.send("-1".encode())
+                    client_socket.send("0000000000".encode())
                 else:
                     # read the file and send it to the server
-                    print("Sending file...")
-                    file_size = os.path.getsize(os.path.join(current_path + "/FileStore", filename))
-                    print("File size: ", file_size)
-                    client_socket.send(str(file_size).encode())
-                    client_socket.send(filename.encode())
-                    with open(os.path.join(current_path + "/FileStore", filename), "rb") as f:
+                    print("\tfile tansfer started...")
+                    size = os.path.getsize(os.path.join(current_path + "/Client/FileStore", filename))
+                    file_size = str(size).zfill(10)
+                    client_socket.send(file_size.encode())
+
+                    with open(os.path.join(current_path + "/Client/FileStore", filename), "rb") as f:
                         while True:
-                            print("reading file")
                             bytes_read = f.read(BUFFER_SIZE)
                             if not bytes_read:
                                 break
                             client_socket.send(bytes_read)
-                    print("File sent successfully")
+                    print("\tfile transfer of " + str(size) + " bytes to server complete and placed in " + dest)
 
         else:  # if the command is not iWant or uTake
-            print("Usage: iWant/uTake <filename> <file directory destination>")
-
+            print("That just aint right!\nUsage: iWant/uTake <filename> <destination directory>")
         
         message = input(" -> ")
 
+    client_socket.send(message.encode())
     print("See ya!")               
     client_socket.close()  # close the connection
 

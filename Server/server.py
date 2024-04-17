@@ -54,8 +54,6 @@ def server_program():
     # get the hostname
     host = socket.gethostname()
     host_ip = socket.gethostbyname(host)
-    print("Host name: " + str(host))
-    print("Host IP: " + str(host_ip))
     # host = 'localhost'
     if(len(sys.argv) != 2):
        print("Usage: python server.py <port_number>")
@@ -74,74 +72,63 @@ def server_program():
         conn, address = server_socket.accept()  # accept new connection
         print("Connection from: " + str(address))
         current_path = os.getcwd()
-        print("Current path: " + str(current_path))
         while True:
+            message = conn.recv(BUFFER_SIZE).decode()
+            info = message.split()
+            command = info[0]
 
-            
-
-            command = conn.recv(BUFFER_SIZE).decode()
-            print("command: ", command)
             if command == "exit":
+                conn.close()
                 break
             elif command == "iWant":
-                filename = conn.recv(BUFFER_SIZE).decode()
-                print("iWant")
-                print("filename: ", filename)
+                filename = info[1]
+                directory = info[2]
+                
                 # check if its in FileStore
-                if not os.path.isfile(os.path.join(current_path + "/FileStore", filename)):
-                    print("file is not file")
-                    conn.send("-1".encode())
-                elif not os.path.exists(os.path.join(current_path +"/FileStore", filename)):
-                    print("file does not exist")
-                    conn.send("-1".encode())
+                if not os.path.isfile(os.path.join(current_path + "/Server/FileStore", filename)):
+                    conn.send("0000000000".encode())
+                elif not os.path.exists(os.path.join(current_path +"/Server/FileStore", filename)):
+                    conn.send("0000000000".encode())
 
                 else:
-                    print("file exists")
-                    filesize = os.path.getsize(os.path.join(current_path + "/FileStore", filename))
-                    conn.send(str(filesize).encode())
-                    with open(os.path.join(current_path + "/FileStore", filename), "rb") as f:
+                    size = os.path.getsize(os.path.join(current_path + "/Server/FileStore", filename))
+                    filesize = str(size).zfill(10)
+                    conn.send(filesize.encode())
+                    with open(os.path.join(current_path + "/Server/FileStore", filename), "rb") as f:
                         while True:
-                            print("reading file")
                             bytes_read = f.read(BUFFER_SIZE)
                             if not bytes_read:
                                 break
                             conn.send(bytes_read)
-                    print("Sent " + str(filesize) + " bytes of " + filename)
             elif command == "uTake":
-                print("uTake")
-                directory = conn.recv(BUFFER_SIZE).decode()
+                filename = info[1]
+                directory = info[2]
+        
                 
                 if(directory == "default"):
-                    directory = current_path + "/ReceivedFiles"
+                    directory = current_path + "/Server/ReceivedFiles"
                 elif(directory == "."):
-                    directory = current_path
+                    directory = current_path + "/Server"
+                else:
+                    directory = current_path + "/Server" + directory
+                
                 if not os.path.exists(directory):
-                    print("not found in directory, please provide the directory")
                     conn.send("-1".encode())
                 elif not os.path.isdir(directory):
-                    print("not a directory")
                     conn.send("-1".encode())
                 else:
-                    print("Directory valid")
                     conn.send("0".encode())
-                    size = conn.recv(BUFFER_SIZE).decode()
-                    print("size: ", size)
-                    if(size == -1):
-                        print("file does not exist")
+                    size = conn.recv(10).decode()
+                    size = int(size)
+                    if(size == 0):
+                        continue
                     else:
-                        print("Recieving file...")
-                        size = int(size)
                         recieve_call = ceil(size/BUFFER_SIZE)
-                        print("recieve call: ", recieve_call)
-                        filename = conn.recv(BUFFER_SIZE).decode()
                         with open(os.path.join(directory, filename), "wb") as f:
-                            print("writing file")
                             for _ in range(recieve_call):
                                 bytes_read = conn.recv(BUFFER_SIZE)
                                 f.write(bytes_read)
                         f.close()
-                        print("Recieved " + str(size) + " bytes of " + filename)
-
         conn.close()  # close the connection
 
 
